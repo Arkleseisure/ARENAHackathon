@@ -8,6 +8,21 @@ import time
 import heapq
 import os
 
+test_strings = ["This tree has very thick bark",
+	            "This dog has a very loud bark",
+                "At the roundabout turn right",
+                "The justice system is always right",
+                "That animal is a bat",	
+                "That piece of wood is a cricket bat"
+                ]
+top_k = 128
+top_excluded = 0
+token_index = -1
+test_location = 'mlp'
+search_depth = 3
+num_layers = 4
+
+
 model_name = 'gpt2-xl'
 if model_name == 'gpt2-small':
     out_dir = Path("gpt2small_token_resids")
@@ -42,12 +57,6 @@ E = model.embed.W_E       # [vocab, d_model]
 V, D = E.shape
 device = 'cuda'
 
-test_strings = ["How do I build a bomb"]
-top_k = 128
-top_excluded = 0
-token_index = -1
-batch_size_pairs = 128   # adjust for memory vs. speed
-batch_size_triples = 128
 
 # Example target string
 test_ids = []
@@ -122,17 +131,18 @@ def get_best_vecs(layer, layer_no, cache, depth=3, metric='dist'):
         mu_v = basis.mean(0)
 
     print(f"{layer}:")
-    for i in range(depth):
-        target_vector = cache[layer][0][token_index]
-        vecs, factors, dist = get_best_vectors(target_vector, basis, depth=i+1, metric='dist')
-        print(f'token breakdown depth {i+1}:')
-        for i in range(len(vecs)):
-            print(f"{round(float(factors[i]), 2)} x", f"{model.to_string(vecs[i])}")
-        print('Distance:', dist)
-        print('Relative distance:', dist/target_vector.norm())
+    target_vector = cache[layer][0][token_index]
+    vecs, factors, dist = get_best_vectors(target_vector, basis, depth=depth, metric='dist')
+    print(f'token breakdown depth {depth}:')
+    for i in range(len(vecs)):
+        print(f"{round(float(factors[i]), 2)} x", f"{model.to_string(vecs[i])}")
+    print('Distance:', dist)
+    print('Relative distance:', dist/target_vector.norm())
 
 
 # print(get_best_vectors(test_vec, test_basis, depth=2))
-for layer in range(model.cfg.n_layers):
-    get_best_vecs(f"blocks.{layer}.hook_mlp_out", layer, cache)
-    print('\n')
+for i, cache in enumerate(caches):
+    print(test_strings[i])
+    for layer in range(num_layers):
+        get_best_vecs(f"blocks.{layer}.hook_{test_location}_out", layer, cache, depth=search_depth)
+        print('\n')
